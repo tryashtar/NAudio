@@ -404,13 +404,13 @@ namespace NAudio.Wave
 
                         if (xingHeader != null && tocIndex == 2)
                         {
-                            decompressBufferOffset += xingHeader.encoderDelay * bytesPerSample;
-                        }
-                        if (xingHeader != null && tocIndex == tableOfContents.Count - 1)
-                        {
                             decompressBufferOffset += xingHeader.encoderPadding * bytesPerSample;
                         }
-                        int toCopy = Math.Min(decompressed - decompressBufferOffset, numBytes - bytesRead);
+                        //if (xingHeader != null && tocIndex == tableOfContents.Count - 1)
+                        //{
+                        //    decompressBufferOffset += xingHeader.encoderPadding * bytesPerSample;
+                        //}
+                        int toCopy = Math.Max(0,Math.Min(decompressed - decompressBufferOffset, numBytes - bytesRead));
                         Array.Copy(decompressBuffer, decompressBufferOffset, sampleBuffer, offset, toCopy);
                         if ((toCopy + decompressBufferOffset) < decompressed)
                         {
