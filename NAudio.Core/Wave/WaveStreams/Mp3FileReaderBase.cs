@@ -23,7 +23,7 @@ namespace NAudio.Wave
         private Stream mp3Stream;
         private readonly long mp3DataLength;
         private readonly long dataStartPosition;
-        
+
         /// <summary>
         /// The MP3 wave format (n.b. NOT the output format of this stream - see the WaveFormat property)
         /// </summary>
@@ -40,7 +40,7 @@ namespace NAudio.Wave
         private readonly int bytesPerDecodedFrame;
 
         private IMp3FrameDecompressor decompressor;
-        
+
         private readonly byte[] decompressBuffer;
         private int decompressBufferOffset;
         private int decompressLeftovers;
@@ -70,7 +70,7 @@ namespace NAudio.Wave
         public Mp3FileReaderBase(Stream inputStream, FrameDecompressorBuilder frameDecompressorBuilder)
             : this(inputStream, frameDecompressorBuilder, false)
         {
-            
+
         }
 
         protected Mp3FileReaderBase(Stream inputStream, FrameDecompressorBuilder frameDecompressorBuilder, bool ownInputStream)
@@ -107,21 +107,42 @@ namespace NAudio.Wave
 
                 mp3DataLength = mp3Stream.Length - dataStartPosition;
 
+                var before_tag = mp3Stream.Length;
                 // try for an ID3v1 tag as well
-                mp3Stream.Position = mp3Stream.Length - 128;
+                mp3Stream.Position = before_tag - 128;
                 byte[] tag = new byte[128];
                 mp3Stream.Read(tag, 0, 128);
                 if (tag[0] == 'T' && tag[1] == 'A' && tag[2] == 'G')
                 {
                     Id3v1Tag = tag;
                     mp3DataLength -= 128;
+                    before_tag -= 128;
+                }
+
+                // APE tag
+                mp3Stream.Position = before_tag - 32;
+                byte[] footer = new byte[32];
+                mp3Stream.Read(footer, 0, 32);
+                if (footer[0] == 'A' && footer[1] == 'P' && footer[2] == 'E' &&
+                    footer[3] == 'T' && footer[4] == 'A' && footer[5] == 'G' &&
+                    footer[6] == 'E' && footer[7] == 'X')
+                {
+                    int tag_size = footer[12] + (footer[13] << 8) + (footer[14] << 16) + (footer[15] << 24);
+                    mp3DataLength -= 32;
+                    before_tag -= 32;
+                    mp3Stream.Position = before_tag - tag_size;
+                    byte[] ape = new byte[tag_size + 32];
+                    mp3Stream.Read(ape, 0, tag_size + 32);
+                    ApeTag = ape;
+                    mp3DataLength -= tag_size + 32;
+                    before_tag -= tag_size + 32;
                 }
 
                 mp3Stream.Position = dataStartPosition;
 
                 // create a temporary MP3 format before we know the real bitrate
                 Mp3WaveFormat = new Mp3WaveFormat(firstFrame.SampleRate,
-                    firstFrame.ChannelMode == ChannelMode.Mono ? 1 : 2, firstFrame.FrameLength, (int) bitRate);
+                    firstFrame.ChannelMode == ChannelMode.Mono ? 1 : 2, firstFrame.FrameLength, (int)bitRate);
 
                 CreateTableOfContents();
                 tocIndex = 0;
@@ -131,16 +152,16 @@ namespace NAudio.Wave
 
                 // Note: in audio, 1 kilobit = 1000 bits.
                 // Calculated as a double to minimize rounding errors
-                bitRate = (mp3DataLength*8.0/TotalSeconds());
+                bitRate = (mp3DataLength * 8.0 / TotalSeconds());
 
                 mp3Stream.Position = dataStartPosition;
 
                 // now we know the real bitrate we can create an accurate MP3 WaveFormat
                 Mp3WaveFormat = new Mp3WaveFormat(firstFrame.SampleRate,
-                    firstFrame.ChannelMode == ChannelMode.Mono ? 1 : 2, firstFrame.FrameLength, (int) bitRate);
+                    firstFrame.ChannelMode == ChannelMode.Mono ? 1 : 2, firstFrame.FrameLength, (int)bitRate);
                 decompressor = frameDecompressorBuilder(Mp3WaveFormat);
                 waveFormat = decompressor.OutputFormat;
-                bytesPerSample = (decompressor.OutputFormat.BitsPerSample)/8*decompressor.OutputFormat.Channels;
+                bytesPerSample = (decompressor.OutputFormat.BitsPerSample) / 8 * decompressor.OutputFormat.Channels;
                 // no MP3 frames have more than 1152 samples in them
                 bytesPerDecodedFrame = 1152 * bytesPerSample;
                 // some MP3s I seem to get double
@@ -177,11 +198,11 @@ namespace NAudio.Wave
                     if (frame != null)
                     {
                         ValidateFrameFormat(frame);
-
                         totalSamples += frame.SampleCount;
                         index.SampleCount = frame.SampleCount;
                         index.ByteCount = (int)(mp3Stream.Position - index.FilePosition);
                         tableOfContents.Add(index);
+
                     }
                 } while (frame != null);
             }
@@ -232,6 +253,9 @@ namespace NAudio.Wave
         // ReSharper disable once InconsistentNaming
         public byte[] Id3v1Tag { get; }
 
+        public byte[] ApeTag { get; }
+
+
         /// <summary>
         /// Reads the next mp3 frame
         /// </summary>
@@ -239,7 +263,7 @@ namespace NAudio.Wave
         public Mp3Frame ReadNextFrame()
         {
             var frame = ReadNextFrame(true);
-            if (frame != null) position += frame.SampleCount*bytesPerSample;
+            if (frame != null) position += frame.SampleCount * bytesPerSample;
             return frame;
         }
 
@@ -249,6 +273,8 @@ namespace NAudio.Wave
         /// <returns>Next mp3 frame, or null if EOF</returns>
         private Mp3Frame ReadNextFrame(bool readData)
         {
+            if (mp3Stream.Position > dataStartPosition + mp3DataLength)
+                return null;
             Mp3Frame frame = null;
             try
             {
@@ -410,7 +436,7 @@ namespace NAudio.Wave
                         //{
                         //    decompressBufferOffset += xingHeader.encoderPadding * bytesPerSample;
                         //}
-                        int toCopy = Math.Max(0,Math.Min(decompressed - decompressBufferOffset, numBytes - bytesRead));
+                        int toCopy = Math.Max(0, Math.Min(decompressed - decompressBufferOffset, numBytes - bytesRead));
                         Array.Copy(decompressBuffer, decompressBufferOffset, sampleBuffer, offset, toCopy);
                         if ((toCopy + decompressBufferOffset) < decompressed)
                         {
