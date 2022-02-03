@@ -20,7 +20,9 @@ namespace NAudio.Wave
         private int vbrScale = -1;
         private int startOffset;
         private int endOffset;
-        
+        public int encoderDelay { get; private set; }
+        public int encoderPadding { get; private set; }
+
         private int tocOffset = -1;
         private int framesOffset = -1;
         private int bytesOffset = -1;
@@ -39,6 +41,16 @@ namespace NAudio.Wave
             x |= buffer[offset+3];
 
             return x;
+        }
+
+        private static string ReadString(byte[] buffer, int offset, int count)
+        {
+            string result = "";
+            for (int i = offset; i < offset + count; i++)
+            {
+                result += (char)buffer[i];
+            }
+            return result;
         }
 
         private void WriteBigEndian(byte[] buffer, int offset, int value)
@@ -126,6 +138,17 @@ namespace NAudio.Wave
                 offset += 4;
             }
             xingHeader.endOffset = offset;
+            if ((frame.RawData[offset + 0] == 'L') &&
+                     (frame.RawData[offset + 1] == 'A') &&
+                     (frame.RawData[offset + 2] == 'M') &&
+                     (frame.RawData[offset + 3] == 'E'))
+            {
+                string lame_version = ReadString(frame.RawData, offset + 4, 5);
+                offset += 21;
+                int combined = (frame.RawData[offset] << 16) | (frame.RawData[offset + 1] << 8) | (frame.RawData[offset + 2]);
+                xingHeader.encoderDelay = (combined & 0xFFF000) >> 12;
+                xingHeader.encoderPadding = combined & 0x000FFF;
+            }
             return xingHeader;
         }
 
