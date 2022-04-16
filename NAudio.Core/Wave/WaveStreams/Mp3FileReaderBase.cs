@@ -399,6 +399,7 @@ namespace NAudio.Wave
                     repositionedFlag = false;
                 }
 
+                int skip_requested = 0;
                 while (bytesRead < numBytes)
                 {
                     Mp3Frame frame = ReadNextFrame(true); // internal read - should not advance position
@@ -428,15 +429,21 @@ namespace NAudio.Wave
                             decompressed = bytesPerDecodedFrame;
                         }
 
-                        if (xingHeader != null && tocIndex == 2)
+                        else if (xingHeader != null)
                         {
-                            decompressBufferOffset += xingHeader.encoderPadding * bytesPerSample;
+                            // the *2 feels arbitrary, but there is definitely extra silence at the start that needs removing
+                            if (tocIndex < 3)
+                                skip_requested = xingHeader.encoderDelay * bytesPerSample * 2;
+                            int end_skip = xingHeader.encoderPadding * bytesPerSample;
+                            // this version removes data too early
+                            // if (tocIndex == tableOfContents.Count - (end_skip + bytesPerDecodedFrame - 1) / bytesPerDecodedFrame)
+                            if (tocIndex == tableOfContents.Count)
+                                skip_requested = end_skip;
                         }
-                        //if (xingHeader != null && tocIndex == tableOfContents.Count - 1)
-                        //{
-                        //    decompressBufferOffset += xingHeader.encoderPadding * bytesPerSample;
-                        //}
-                        int toCopy = Math.Max(0, Math.Min(decompressed - decompressBufferOffset, numBytes - bytesRead));
+                        int skipped = Math.Min(skip_requested, decompressed);
+                        decompressBufferOffset += skipped;
+                        skip_requested -= skipped;
+                        int toCopy = Math.Min(decompressed - decompressBufferOffset, numBytes - bytesRead);
                         Array.Copy(decompressBuffer, decompressBufferOffset, sampleBuffer, offset, toCopy);
                         if ((toCopy + decompressBufferOffset) < decompressed)
                         {
