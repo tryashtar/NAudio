@@ -61,7 +61,7 @@ namespace NAudio.Wave
         protected MediaFoundationReader()
         {
         }
-        
+
         /// <summary>
         /// Creates a new MediaFoundationReader based on the supplied file
         /// </summary>
@@ -125,7 +125,7 @@ namespace NAudio.Wave
                 return new WaveFormat(sampleRate, bits, channels);
             if (audioSubType == AudioSubtypes.MFAudioFormat_Float)
                 return WaveFormat.CreateIeeeFloatWaveFormat(sampleRate, channels);
-            var subTypeDescription = FieldDescriptionHelper.Describe(typeof (AudioSubtypes), audioSubType);
+            var subTypeDescription = FieldDescriptionHelper.Describe(typeof(AudioSubtypes), audioSubType);
             throw new InvalidDataException(String.Format("Unsupported audio sub Type {0}", subTypeDescription));
         }
 
@@ -165,7 +165,7 @@ namespace NAudio.Wave
                 reader.SetCurrentMediaType(MediaFoundationInterop.MF_SOURCE_READER_FIRST_AUDIO_STREAM, IntPtr.Zero, partialMediaType.MediaFoundationObject);
             }
             catch (COMException ex) when (ex.GetHResult() == MediaFoundationErrors.MF_E_INVALIDMEDIATYPE)
-            {               
+            {
                 // HE-AAC (and v2) seems to halve the samplerate
                 if (currentMediaType.SubType == AudioSubtypes.MFAudioFormat_AAC && currentMediaType.ChannelCount == 1)
                 {
@@ -203,7 +203,7 @@ namespace NAudio.Wave
                 var lengthInBytes = (((long)variant.Value) * waveFormat.AverageBytesPerSecond) / 10000000L;
                 return lengthInBytes;
             }
-            finally 
+            finally
             {
                 PropVariant.Clear(variantPtr);
                 Marshal.FreeHGlobal(variantPtr);
@@ -353,11 +353,18 @@ namespace NAudio.Wave
             long nsPosition = (10000000L * repositionTo) / waveFormat.AverageBytesPerSecond;
             var pv = PropVariant.FromLong(nsPosition);
             var ptr = Marshal.AllocHGlobal(Marshal.SizeOf(pv));
-            Marshal.StructureToPtr(pv,ptr,false);
-            
+            Marshal.StructureToPtr(pv, ptr, false);
+
             // should pass in a variant of type VT_I8 which is a long containing time in 100nanosecond units
             pReader.SetCurrentPosition(Guid.Empty, ptr);
             Marshal.FreeHGlobal(ptr);
+
+            ulong timestamp;
+            do
+            {
+                pReader.ReadSample(MediaFoundationInterop.MF_SOURCE_READER_FIRST_AUDIO_STREAM, 0, out _, out _, out timestamp, out _);
+            } while (timestamp < (ulong)nsPosition);
+
             decoderOutputCount = 0;
             decoderOutputOffset = 0;
             position = desiredPosition;
