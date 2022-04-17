@@ -44,28 +44,45 @@ namespace NAudio.Wave
         /// <param name="fileName">File Name</param>
         private void CreateReaderStream(string fileName)
         {
-            if (fileName.EndsWith(".wav", StringComparison.OrdinalIgnoreCase))
+            var possible_streams = new Func<WaveStream>[]
             {
-                readerStream = new WaveFileReader(fileName);
-                if (readerStream.WaveFormat.Encoding != WaveFormatEncoding.Pcm && readerStream.WaveFormat.Encoding != WaveFormatEncoding.IeeeFloat)
+                () => new Mp3FileReader(fileName),
+                () => new AiffFileReader(fileName),
+                () =>
                 {
-                    readerStream = WaveFormatConversionStream.CreatePcmStream(readerStream);
-                    readerStream = new BlockAlignReductionStream(readerStream);
+                    WaveStream stream = new WaveFileReader(fileName);
+                    if (stream.WaveFormat.Encoding != WaveFormatEncoding.Pcm && stream.WaveFormat.Encoding != WaveFormatEncoding.IeeeFloat)
+                    {
+                        stream = WaveFormatConversionStream.CreatePcmStream(stream);
+                        stream = new BlockAlignReductionStream(stream);
+                    }
+                    return stream;
+                },
+                () => new MediaFoundationReader(fileName)
+            };
+            int first = 0;
+            if (fileName.EndsWith(".wav", StringComparison.OrdinalIgnoreCase))
+                first = 1;
+            if (fileName.EndsWith(".aiff", StringComparison.OrdinalIgnoreCase) || fileName.EndsWith(".aif", StringComparison.OrdinalIgnoreCase))
+                first = 2;
+            try
+            {
+                readerStream = possible_streams[first]();
+                return;
+            }
+            catch { }
+            for (int i = 0; i < possible_streams.Length; i++)
+            {
+                if (i == first)
+                    continue;
+                try
+                {
+                    readerStream = possible_streams[i]();
+                    return;
                 }
+                catch { }
             }
-            else if (fileName.EndsWith(".mp3", StringComparison.OrdinalIgnoreCase))
-            {
-                readerStream = new Mp3FileReader(fileName);
-            }
-            else if (fileName.EndsWith(".aiff", StringComparison.OrdinalIgnoreCase) || fileName.EndsWith(".aif", StringComparison.OrdinalIgnoreCase))
-            {
-                readerStream = new AiffFileReader(fileName);
-            }
-            else
-            {
-                // fall back to media foundation reader, see if that can play it
-                readerStream = new MediaFoundationReader(fileName);
-            }
+            throw new ArgumentException($"Couldn't find reader for {fileName}");
         }
         /// <summary>
         /// File Name
