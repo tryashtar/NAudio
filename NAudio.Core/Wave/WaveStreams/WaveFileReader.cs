@@ -2,8 +2,9 @@ using System;
 using System.IO;
 using System.Collections.Generic;
 using NAudio.FileFormats.Wav;
+using NAudio.Utils;
 
-namespace NAudio.Wave 
+namespace NAudio.Wave
 {
     /// <summary>This class supports the reading of WAV files,
     /// providing a repositionable WaveStream that returns the raw data
@@ -18,6 +19,15 @@ namespace NAudio.Wave
         private readonly object lockObject = new object();
         private Stream waveStream;
 
+        public static WaveFileReader TryOpen(FileStream stream)
+        {
+            var br = new BinaryReader(stream);
+            int header = br.ReadInt32();
+            if (header == ChunkIdentifier.ChunkIdentifierToInt32("RF64") || header == ChunkIdentifier.ChunkIdentifierToInt32("RIFF"))
+                return new WaveFileReader(stream, true);
+            return null;
+        }
+
         /// <summary>Supports opening a WAV file</summary>
         /// <remarks>The WAV file format is a real mess, but we will only
         /// support the basic WAV file format which actually covers the vast
@@ -28,7 +38,7 @@ namespace NAudio.Wave
         /// </remarks>
         public WaveFileReader(String waveFile) :
             this(File.OpenRead(waveFile), true)
-        {            
+        {
         }
 
         /// <summary>
@@ -182,12 +192,12 @@ namespace NAudio.Wave
                 // sometimes there is more junk at the end of the file past the data chunk
                 if (Position + count > dataChunkLength)
                 {
-                    count = (int) (dataChunkLength - Position);
+                    count = (int)(dataChunkLength - Position);
                 }
                 return waveStream.Read(array, offset, count);
             }
         }
-        
+
         /// <summary>
         /// Attempts to read the next sample or group of samples as floating point normalised into the range -1.0f to 1.0f
         /// </summary>
@@ -205,7 +215,7 @@ namespace NAudio.Wave
                     throw new InvalidOperationException("Only 16, 24 or 32 bit PCM or IEEE float audio data supported");
             }
             var sampleFrame = new float[waveFormat.Channels];
-            int bytesToRead = waveFormat.Channels*(waveFormat.BitsPerSample/8);
+            int bytesToRead = waveFormat.Channels * (waveFormat.BitsPerSample / 8);
             byte[] raw = new byte[bytesToRead];
             int bytesRead = Read(raw, 0, bytesToRead);
             if (bytesRead == 0) return null; // end of file
@@ -215,7 +225,7 @@ namespace NAudio.Wave
             {
                 if (waveFormat.BitsPerSample == 16)
                 {
-                    sampleFrame[channel] = BitConverter.ToInt16(raw, offset)/32768f;
+                    sampleFrame[channel] = BitConverter.ToInt16(raw, offset) / 32768f;
                     offset += 2;
                 }
                 else if (waveFormat.BitsPerSample == 24)

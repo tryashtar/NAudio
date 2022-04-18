@@ -9,6 +9,22 @@ namespace NAudio.Wave
     /// </summary>
     public class Mp3FileReader : Mp3FileReaderBase
     {
+        public static Mp3FileReader TryOpen(FileStream stream)
+        {
+            byte[] first_bytes = new byte[3];
+            stream.Read(first_bytes, 0, 3);
+            stream.Position = 0;
+            if ((first_bytes[0] == 0x49 && first_bytes[1] == 0x44 && first_bytes[2] == 0x33) || first_bytes[0] == 0xFF && first_bytes[1] == 0xFB)
+                return new Mp3FileReader(stream, true);
+            return null;
+        }
+
+        /// <summary>Supports opening a MP3 file</summary>
+        private Mp3FileReader(Stream inputStream, bool ownInputStream)
+            : base(inputStream, CreateAcmFrameDecompressor, ownInputStream)
+        {
+        }
+
         /// <summary>Supports opening a MP3 file</summary>
         public Mp3FileReader(string mp3FileName)
             : base(File.OpenRead(mp3FileName), CreateAcmFrameDecompressor, true)

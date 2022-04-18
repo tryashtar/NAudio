@@ -1,4 +1,5 @@
 ﻿using System;
+using System.IO;
 using NAudio.Wave.SampleProviders;
 
 // ReSharper disable once CheckNamespace
@@ -33,7 +34,7 @@ namespace NAudio.Wave
             CreateReaderStream(fileName);
             sourceBytesPerSample = (readerStream.WaveFormat.BitsPerSample / 8) * readerStream.WaveFormat.Channels;
             sampleChannel = new SampleChannel(readerStream, false);
-            destBytesPerSample = 4*sampleChannel.WaveFormat.Channels;
+            destBytesPerSample = 4 * sampleChannel.WaveFormat.Channels;
             length = SourceToDest(readerStream.Length);
         }
 
@@ -44,13 +45,16 @@ namespace NAudio.Wave
         /// <param name="fileName">File Name</param>
         private void CreateReaderStream(string fileName)
         {
+            var fileStream = File.OpenRead(fileName);
             var possible_streams = new Func<WaveStream>[]
             {
-                () => new Mp3FileReader(fileName),
-                () => new AiffFileReader(fileName),
+                () => Mp3FileReader.TryOpen(fileStream),
+                () => AiffFileReader.TryOpen(fileStream),
                 () =>
                 {
-                    WaveStream stream = new WaveFileReader(fileName);
+                    WaveStream stream = WaveFileReader.TryOpen(fileStream);
+                    if (stream == null)
+                        return null;
                     if (stream.WaveFormat.Encoding != WaveFormatEncoding.Pcm && stream.WaveFormat.Encoding != WaveFormatEncoding.IeeeFloat)
                     {
                         stream = WaveFormatConversionStream.CreatePcmStream(stream);
@@ -58,29 +62,23 @@ namespace NAudio.Wave
                     }
                     return stream;
                 },
-                () => new MediaFoundationReader(fileName)
+                () => MediaFoundationReader.TryOpen(fileStream)
             };
             int first = 0;
             if (fileName.EndsWith(".wav", StringComparison.OrdinalIgnoreCase))
                 first = 1;
             if (fileName.EndsWith(".aiff", StringComparison.OrdinalIgnoreCase) || fileName.EndsWith(".aif", StringComparison.OrdinalIgnoreCase))
                 first = 2;
-            try
-            {
-                readerStream = possible_streams[first]();
+            readerStream = possible_streams[first]();
+            if (readerStream != null)
                 return;
-            }
-            catch { }
             for (int i = 0; i < possible_streams.Length; i++)
             {
                 if (i == first)
                     continue;
-                try
-                {
-                    readerStream = possible_streams[i]();
+                readerStream = possible_streams[i]();
+                if (readerStream != null)
                     return;
-                }
-                catch { }
             }
             throw new ArgumentException($"Couldn't find reader for {fileName}");
         }
@@ -105,7 +103,7 @@ namespace NAudio.Wave
         public override long Position
         {
             get { return SourceToDest(readerStream.Position); }
-            set { lock (lockObject) { readerStream.Position = DestToSource(value); }  }
+            set { lock (lockObject) { readerStream.Position = DestToSource(value); } }
         }
 
         /// <summary>
@@ -144,7 +142,7 @@ namespace NAudio.Wave
         public float Volume
         {
             get { return sampleChannel.Volume; }
-            set { sampleChannel.Volume = value; } 
+            set { sampleChannel.Volume = value; }
         }
 
         /// <summary>
@@ -171,7 +169,8 @@ namespace NAudio.Wave
         {
             if (disposing)
             {
-                if (readerStream != null) {
+                if (readerStream != null)
+                {
                     readerStream.Dispose();
                     readerStream = null;
                 }

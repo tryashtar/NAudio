@@ -25,6 +25,11 @@ namespace NAudio.Wave
 
         private long position;
 
+        public static MediaFoundationReader TryOpen(FileStream stream)
+        {
+            return new MediaFoundationReader(stream.Name);
+        }
+
         /// <summary>
         /// Allows customisation of this reader class
         /// </summary>
