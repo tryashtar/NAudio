@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
     <Version>2.0.1</Version>
@@ -18,15 +18,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\NAudio.Asio\NAudio.Asio.csproj" />
-    <ProjectReference Include="..\NAudio.Core\NAudio.Core.csproj" />
-    <ProjectReference Include="..\NAudio.Midi\NAudio.Midi.csproj" />
-    <ProjectReference Include="..\NAudio.Wasapi\NAudio.Wasapi.csproj" />
-    <ProjectReference Include="..\NAudio.WinForms\NAudio.WinForms.csproj" />
-    <ProjectReference Include="..\NAudio.WinMM\NAudio.WinMM.csproj" />
-  </ItemGroup>
-
-  <ItemGroup>
     <None Include="..\license.txt">
       <Pack>True</Pack>
       <PackagePath></PackagePath>
@@ -35,5 +26,11 @@
       <Pack>True</Pack>
       <PackagePath></PackagePath>
     </None>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\NAudio.Core\NAudio.Core.csproj" />
+    <ProjectReference Include="..\NAudio.Wasapi\NAudio.Wasapi.csproj" />
+    <ProjectReference Include="..\NAudio.WinMM\NAudio.WinMM.csproj" />
   </ItemGroup>
 </Project>
