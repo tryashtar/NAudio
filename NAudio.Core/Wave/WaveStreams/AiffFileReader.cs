@@ -23,9 +23,9 @@ namespace NAudio.Wave
         public static AiffFileReader TryOpen(FileStream stream)
         {
             var br = new BinaryReader(stream);
-            var name = ReadChunkName(br);
+            var name = br.ReadBytes(4);
             stream.Position = 0;
-            if (name != "FORM")
+            if (name[0] != 'F' || name[1] != 'O' || name[2] != 'R' || name[3] != 'M')
                 return null;
             return new AiffFileReader(stream, true);
         }
