@@ -62,6 +62,7 @@ namespace NAudio.Wave
                     }
                     return stream;
                 },
+                () => TryOpenOgg(fileStream),
                 () => MediaFoundationReader.TryOpen(fileStream)
             };
             int first = 0;
@@ -69,6 +70,8 @@ namespace NAudio.Wave
                 first = 1;
             if (fileName.EndsWith(".aiff", StringComparison.OrdinalIgnoreCase) || fileName.EndsWith(".aif", StringComparison.OrdinalIgnoreCase))
                 first = 2;
+            if (fileName.EndsWith(".ogg", StringComparison.OrdinalIgnoreCase))
+                first = 3;
             readerStream = possible_streams[first]();
             if (readerStream != null)
                 return;
@@ -82,6 +85,14 @@ namespace NAudio.Wave
             }
             throw new ArgumentException($"Couldn't find reader for {fileName}");
         }
+
+        private static Vorbis.VorbisWaveReader TryOpenOgg(FileStream stream)
+        {
+            if (!new NVorbis.Ogg.ContainerReader(stream, false).TryInit())
+                return null;
+            return new Vorbis.VorbisWaveReader(stream, true);
+        }
+
         /// <summary>
         /// File Name
         /// </summary>
