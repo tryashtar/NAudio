@@ -66,9 +66,9 @@ namespace NAudio.Wave
                 () => MediaFoundationReader.TryOpen(fileStream)
             };
             int first = 0;
-            if (fileName.EndsWith(".wav", StringComparison.OrdinalIgnoreCase))
-                first = 1;
             if (fileName.EndsWith(".aiff", StringComparison.OrdinalIgnoreCase) || fileName.EndsWith(".aif", StringComparison.OrdinalIgnoreCase))
+                first = 1;
+            if (fileName.EndsWith(".wav", StringComparison.OrdinalIgnoreCase))
                 first = 2;
             if (fileName.EndsWith(".ogg", StringComparison.OrdinalIgnoreCase))
                 first = 3;

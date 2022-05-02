@@ -23,6 +23,7 @@ namespace NAudio.Wave
         {
             var br = new BinaryReader(stream);
             int header = br.ReadInt32();
+            stream.Position = 0;
             if (header == ChunkIdentifier.ChunkIdentifierToInt32("RF64") || header == ChunkIdentifier.ChunkIdentifierToInt32("RIFF"))
                 return new WaveFileReader(stream, true);
             return null;
