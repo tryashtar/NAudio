@@ -88,9 +88,12 @@ namespace NAudio.Wave
 
         private static Vorbis.VorbisWaveReader TryOpenOgg(FileStream stream)
         {
-            if (!new NVorbis.Ogg.ContainerReader(stream, false).TryInit())
-                return null;
-            return new Vorbis.VorbisWaveReader(stream, true);
+            byte[] first_bytes = new byte[4];
+            stream.Read(first_bytes, 0, 4);
+            stream.Position = 0;
+            if (first_bytes[0] == 'O' && first_bytes[1] == 'g' && first_bytes[2] == 'g' && first_bytes[3] == 'S')
+                return new Vorbis.VorbisWaveReader(stream, true);
+            return null;
         }
 
         /// <summary>
