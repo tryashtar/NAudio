@@ -254,26 +254,9 @@ namespace NAudio.Wave
 
             while (bytesWritten < count)
             {
-                IMFSample pSample;
-                MF_SOURCE_READER_FLAG dwFlags;
-                ulong timestamp;
-                int actualStreamIndex;
-                pReader.ReadSample(MediaFoundationInterop.MF_SOURCE_READER_FIRST_AUDIO_STREAM, 0, out actualStreamIndex, out dwFlags, out timestamp, out pSample);
-                if ((dwFlags & MF_SOURCE_READER_FLAG.MF_SOURCE_READERF_ENDOFSTREAM) != 0)
-                {
-                    // reached the end of the stream
+                var pSample = ReadSample(out bool eos, out _);
+                if (eos)
                     break;
-                }
-                else if ((dwFlags & MF_SOURCE_READER_FLAG.MF_SOURCE_READERF_CURRENTMEDIATYPECHANGED) != 0)
-                {
-                    waveFormat = GetCurrentWaveFormat(pReader);
-                    OnWaveFormatChanged();
-                    // carry on, but user must handle the change of format
-                }
-                else if (dwFlags != 0)
-                {
-                    throw new InvalidOperationException(String.Format("MediaFoundationReadError {0}", dwFlags));
-                }
 
                 IMFMediaBuffer pBuffer;
                 pSample.ConvertToContiguousBuffer(out pBuffer);
@@ -295,6 +278,29 @@ namespace NAudio.Wave
             }
             position += bytesWritten;
             return bytesWritten;
+        }
+
+        private IMFSample ReadSample(out bool eos, out ulong timestamp)
+        {
+            IMFSample pSample;
+            MF_SOURCE_READER_FLAG dwFlags;
+            eos = false;
+            pReader.ReadSample(MediaFoundationInterop.MF_SOURCE_READER_FIRST_AUDIO_STREAM, 0, out _, out dwFlags, out timestamp, out pSample);
+            if ((dwFlags & MF_SOURCE_READER_FLAG.MF_SOURCE_READERF_ENDOFSTREAM) != 0)
+            {
+                eos = true;
+            }
+            else if ((dwFlags & MF_SOURCE_READER_FLAG.MF_SOURCE_READERF_CURRENTMEDIATYPECHANGED) != 0)
+            {
+                waveFormat = GetCurrentWaveFormat(pReader);
+                OnWaveFormatChanged();
+                // carry on, but user must handle the change of format
+            }
+            else if (dwFlags != 0)
+            {
+                throw new InvalidOperationException(String.Format("MediaFoundationReadError {0}", dwFlags));
+            }
+            return pSample;
         }
 
         private int ReadFromDecoderBuffer(byte[] buffer, int offset, int needed)
@@ -351,24 +357,38 @@ namespace NAudio.Wave
             }
         }
 
-        private long repositionTo = -1;
-
-        private void Reposition(long desiredPosition)
+        private void TrySeekTo(long pos)
         {
-            long nsPosition = (10000000L * repositionTo) / waveFormat.AverageBytesPerSecond;
-            var pv = PropVariant.FromLong(nsPosition);
+            var pv = PropVariant.FromLong(pos);
             var ptr = Marshal.AllocHGlobal(Marshal.SizeOf(pv));
             Marshal.StructureToPtr(pv, ptr, false);
 
             // should pass in a variant of type VT_I8 which is a long containing time in 100nanosecond units
             pReader.SetCurrentPosition(Guid.Empty, ptr);
             Marshal.FreeHGlobal(ptr);
+        }
+
+        private long repositionTo = -1;
+
+        private void Reposition(long desiredPosition)
+        {
+            long adjustedPosition = (10000000L * repositionTo) / waveFormat.AverageBytesPerSecond;
+            long aimingPosition = adjustedPosition;
+            TrySeekTo(aimingPosition);
 
             ulong timestamp;
-            do
+            bool eos;
+            ReadSample(out eos, out timestamp);
+            if (!eos && timestamp > (ulong)adjustedPosition)
             {
-                pReader.ReadSample(MediaFoundationInterop.MF_SOURCE_READER_FIRST_AUDIO_STREAM, 0, out _, out _, out timestamp, out _);
-            } while (timestamp < (ulong)nsPosition);
+                aimingPosition = 2 * adjustedPosition - (long)timestamp;
+                TrySeekTo(aimingPosition);
+                ReadSample(out eos, out timestamp);
+            }
+            while (!eos && timestamp < (ulong)adjustedPosition)
+            {
+                ReadSample(out eos, out timestamp);
+            }
 
             decoderOutputCount = 0;
             decoderOutputOffset = 0;
