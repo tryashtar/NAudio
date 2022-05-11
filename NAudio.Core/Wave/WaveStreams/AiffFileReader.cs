@@ -20,16 +20,6 @@ namespace NAudio.Wave
         private Stream waveStream;
         private readonly object lockObject = new object();
 
-        public static AiffFileReader TryOpen(FileStream stream)
-        {
-            var br = new BinaryReader(stream);
-            var name = br.ReadBytes(4);
-            stream.Position = 0;
-            if (name[0] != 'F' || name[1] != 'O' || name[2] != 'R' || name[3] != 'M')
-                return null;
-            return new AiffFileReader(stream, true);
-        }
-
         /// <summary>Supports opening a AIF file</summary>
         /// <remarks>The AIF is of similar nastiness to the WAV format.
         /// This supports basic reading of uncompressed PCM AIF files,

@@ -27,73 +27,15 @@ namespace NAudio.Wave
         /// Initializes a new instance of AudioFileReader
         /// </summary>
         /// <param name="fileName">The file to open</param>
-        public AudioFileReader(string fileName)
+        public AudioFileReader(string fileName, Func<string, WaveStream> reader_getter)
         {
             lockObject = new object();
             FileName = fileName;
-            CreateReaderStream(fileName);
+            readerStream = reader_getter(fileName);
             sourceBytesPerSample = (readerStream.WaveFormat.BitsPerSample / 8) * readerStream.WaveFormat.Channels;
             sampleChannel = new SampleChannel(readerStream, false);
             destBytesPerSample = 4 * sampleChannel.WaveFormat.Channels;
             length = SourceToDest(readerStream.Length);
-        }
-
-        /// <summary>
-        /// Creates the reader stream, supporting all filetypes in the core NAudio library,
-        /// and ensuring we are in PCM format
-        /// </summary>
-        /// <param name="fileName">File Name</param>
-        private void CreateReaderStream(string fileName)
-        {
-            var fileStream = File.OpenRead(fileName);
-            var possible_streams = new Func<WaveStream>[]
-            {
-                () => Mp3FileReader.TryOpen(fileStream),
-                () => AiffFileReader.TryOpen(fileStream),
-                () =>
-                {
-                    WaveStream stream = WaveFileReader.TryOpen(fileStream);
-                    if (stream == null)
-                        return null;
-                    if (stream.WaveFormat.Encoding != WaveFormatEncoding.Pcm && stream.WaveFormat.Encoding != WaveFormatEncoding.IeeeFloat)
-                    {
-                        stream = WaveFormatConversionStream.CreatePcmStream(stream);
-                        stream = new BlockAlignReductionStream(stream);
-                    }
-                    return stream;
-                },
-                () => TryOpenOgg(fileStream),
-                () => MediaFoundationReader.TryOpen(fileStream)
-            };
-            int first = 0;
-            if (fileName.EndsWith(".aiff", StringComparison.OrdinalIgnoreCase) || fileName.EndsWith(".aif", StringComparison.OrdinalIgnoreCase))
-                first = 1;
-            if (fileName.EndsWith(".wav", StringComparison.OrdinalIgnoreCase))
-                first = 2;
-            if (fileName.EndsWith(".ogg", StringComparison.OrdinalIgnoreCase))
-                first = 3;
-            readerStream = possible_streams[first]();
-            if (readerStream != null)
-                return;
-            for (int i = 0; i < possible_streams.Length; i++)
-            {
-                if (i == first)
-                    continue;
-                readerStream = possible_streams[i]();
-                if (readerStream != null)
-                    return;
-            }
-            throw new ArgumentException($"Couldn't find reader for {fileName}");
-        }
-
-        private static Vorbis.VorbisWaveReader TryOpenOgg(FileStream stream)
-        {
-            byte[] first_bytes = new byte[4];
-            stream.Read(first_bytes, 0, 4);
-            stream.Position = 0;
-            if (first_bytes[0] == 'O' && first_bytes[1] == 'g' && first_bytes[2] == 'g' && first_bytes[3] == 'S')
-                return new Vorbis.VorbisWaveReader(stream, true);
-            return null;
         }
 
         /// <summary>

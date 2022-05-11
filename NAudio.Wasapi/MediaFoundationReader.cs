@@ -243,6 +243,7 @@ namespace NAudio.Wave
             if (repositionTo != -1)
             {
                 Reposition(repositionTo);
+                repositionTo = -1; // clear the flag
             }
 
             int bytesWritten = 0;
@@ -372,7 +373,7 @@ namespace NAudio.Wave
 
         private void Reposition(long desiredPosition)
         {
-            long adjustedPosition = (10000000L * repositionTo) / waveFormat.AverageBytesPerSecond;
+            long adjustedPosition = (10000000L * desiredPosition) / waveFormat.AverageBytesPerSecond;
             long aimingPosition = adjustedPosition;
             TrySeekTo(aimingPosition);
 
@@ -393,7 +394,6 @@ namespace NAudio.Wave
             decoderOutputCount = 0;
             decoderOutputOffset = 0;
             position = desiredPosition;
-            repositionTo = -1;// clear the flag
         }
 
         /// <summary>

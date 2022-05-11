@@ -19,16 +19,6 @@ namespace NAudio.Wave
         private readonly object lockObject = new object();
         private Stream waveStream;
 
-        public static WaveFileReader TryOpen(FileStream stream)
-        {
-            var br = new BinaryReader(stream);
-            int header = br.ReadInt32();
-            stream.Position = 0;
-            if (header == ChunkIdentifier.ChunkIdentifierToInt32("RF64") || header == ChunkIdentifier.ChunkIdentifierToInt32("RIFF"))
-                return new WaveFileReader(stream, true);
-            return null;
-        }
-
         /// <summary>Supports opening a WAV file</summary>
         /// <remarks>The WAV file format is a real mess, but we will only
         /// support the basic WAV file format which actually covers the vast
@@ -51,7 +41,7 @@ namespace NAudio.Wave
         {
         }
 
-        private WaveFileReader(Stream inputStream, bool ownInput)
+        public WaveFileReader(Stream inputStream, bool ownInput)
         {
             this.waveStream = inputStream;
             var chunkReader = new WaveFileChunkReader();
